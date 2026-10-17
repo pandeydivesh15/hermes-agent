@@ -184,6 +184,8 @@ def _http_json(url: str, payload: Optional[dict] = None) -> dict:
 
 def _osv_query_batch(components: list[Component]) -> dict[Component, list[str]]:
     """Return {component -> [osv_id, ...]} for components with any vulns."""
+    from tools.osv_check import _cache_put
+
     findings: dict[Component, list[str]] = {}
     for chunk_start in range(0, len(components), OSV_BATCH_MAX):
         chunk = components[chunk_start:chunk_start + OSV_BATCH_MAX]
@@ -193,8 +195,16 @@ def _osv_query_batch(components: list[Component]) -> dict[Component, list[str]]:
         except _HTTP_ERRORS as exc:
             raise RuntimeError(f"OSV batch query failed: {exc}") from exc
         for comp, result in zip(chunk, resp.get("results") or []):
-            if ids := [v.get("id") for v in (result or {}).get("vulns") or [] if v.get("id")]:
+            ids = [v.get("id") for v in (result or {}).get("vulns") or []
+                   if v.get("id")]
+            if ids:
                 findings[comp] = ids
+            malware = [vid for vid in ids if vid.startswith("MAL-")]
+            verdict = (
+                f"BLOCKED: Package '{comp.name}' ({comp.ecosystem}) has "
+                f"known malware advisories: {', '.join(malware[:3])}"
+            ) if malware else None
+            _cache_put((comp.ecosystem, comp.name, comp.version), verdict)
     return findings
 
 

@@ -59,8 +59,7 @@
 //   PHOTON_SIDECAR_WATCH_STDIN  "1" = exit when stdin hits EOF (set by the
 //                          adapter, which holds our stdin pipe — parent-death
 //                          detection so a dead gateway can't orphan us)
-//   PHOTON_TELEMETRY       enable Spectrum SDK telemetry ("true"/"1"/"on"/"yes";
-//                          default off — toggle with `hermes photon telemetry`)
+// Spectrum SDK telemetry is disabled by fork policy.
 
 import http from "node:http";
 import crypto from "node:crypto";
@@ -79,9 +78,8 @@ const projectSecret = process.env.PHOTON_PROJECT_SECRET;
 const port = parseInt(process.env.PHOTON_SIDECAR_PORT || "8789", 10);
 const bind = process.env.PHOTON_SIDECAR_BIND || "127.0.0.1";
 const sharedToken = process.env.PHOTON_SIDECAR_TOKEN;
-const telemetry = /^(1|true|yes|on)$/i.test(
-  (process.env.PHOTON_TELEMETRY || "").trim()
-);
+// Fork policy overrides SDK telemetry opt-ins.
+const telemetry = false;
 
 // Inbound binary content is read into memory and base64-inlined on the NDJSON
 // event so the Python adapter can cache the real bytes (and the agent can see

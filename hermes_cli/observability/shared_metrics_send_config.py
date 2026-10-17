@@ -59,6 +59,8 @@ def resolve_send_config(config: dict | None) -> SendConfig:
     shared = shared if isinstance(shared, dict) else {}
 
     enabled = shared.get("enabled") is True
+    from hermes_cli.fork_network_policy import OPTIONAL_NETWORK_ALLOWED
+
     send_requested = shared.get("send") is True
 
     if send_requested and not enabled:
@@ -86,4 +88,7 @@ def resolve_send_config(config: dict | None) -> SendConfig:
         )
         return SendConfig(enabled=enabled, send=False, endpoint=endpoint)
 
-    return SendConfig(enabled=enabled, send=send_requested, endpoint=endpoint)
+    return SendConfig(
+        enabled=enabled, send=OPTIONAL_NETWORK_ALLOWED and send_requested,
+        endpoint=endpoint,
+    )

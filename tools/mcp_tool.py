@@ -31,23 +31,21 @@ from tools.mcp_tool_server_run import MCPServerRunMixin
 from tools.mcp_tool_health import MCPServerHealthMixin
 
 
-# Wall-clock bound on the fail-open OSV malware preflight before a stdio spawn; just ABOVE
-# osv_check._TIMEOUT (10s) so it only bites when a stalled SSL handshake defeats that.
+# Bound local advisory reads so an unavailable cache cannot stall MCP startup.
 _OSV_MALWARE_CHECK_TIMEOUT_S = 12.0
 
 
 async def _preflight_stdio_command(server_name: str, command: str, args: list) -> tuple[str, list]:
-    """OSV malware preflight (off-loop, wall-clock bound, fail-open on timeout), THEN the
-    cached-npx swap. The preflight must see the REAL command/args: anything that rewrites argv to a
-    wrapper or resolved binary has to happen after it, or the check silently inspects the wrapper
-    and becomes a no-op (``_infer_ecosystem`` keys off the command basename being npx/uvx/pipx)."""
-    from tools.osv_check import check_package_for_malware
+    """Check local malware verdicts before resolving a package launcher."""
+    from tools.osv_check import check_cached_package_for_malware
     try:
         malware_error = await asyncio.wait_for(
-            asyncio.to_thread(check_package_for_malware, command, args), timeout=_OSV_MALWARE_CHECK_TIMEOUT_S)
+            asyncio.to_thread(check_cached_package_for_malware, command, args),
+            timeout=_OSV_MALWARE_CHECK_TIMEOUT_S,
+        )
     except TimeoutError:
-        logger.warning("MCP server '%s': OSV malware preflight timed out after %.0fs "
-                       "(network slow/unreachable) — proceeding without the check.",
+        logger.warning("MCP server '%s': local preflight timed out after %.0fs "
+                       "(cache unavailable) — proceeding without the check.",
                        server_name, _OSV_MALWARE_CHECK_TIMEOUT_S)
         malware_error = None
     if malware_error:

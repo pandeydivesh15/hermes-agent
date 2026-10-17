@@ -1630,27 +1630,27 @@ describe('startUpdatePoller', () => {
     vi.useRealTimers()
   })
 
-  it('calls checkUpdates() on startup so the version pill populates immediately', async () => {
+  it('does not check updates on startup', async () => {
     startUpdatePoller()
 
     // checkUpdates() is async — flush microtasks without advancing the daily interval.
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(checkMock).toHaveBeenCalled()
-    expect($updateStatus.get()?.behind).toBe(5)
+    expect(checkMock).not.toHaveBeenCalled()
+    expect($updateStatus.get()).toBeNull()
   })
 
-  it('polls once per day and never forces past the caches', async () => {
+  it('does not poll after the daily interval', async () => {
     startUpdatePoller()
     await vi.advanceTimersByTimeAsync(0)
-    expect(checkMock).toHaveBeenCalledWith({ force: false })
+    expect(checkMock).not.toHaveBeenCalled()
     checkMock.mockClear()
 
     await vi.advanceTimersByTimeAsync(BACKGROUND_UPDATE_CHECK_MS - 1)
     expect(checkMock).not.toHaveBeenCalled()
 
     await vi.advanceTimersByTimeAsync(1)
-    expect(checkMock).toHaveBeenCalledTimes(1)
+    expect(checkMock).not.toHaveBeenCalled()
   })
 
   it('passes an explicit manual check through to the main process', async (): Promise<void> => {
@@ -1658,7 +1658,7 @@ describe('startUpdatePoller', () => {
     expect(checkMock).toHaveBeenCalledWith({ force: true })
   })
 
-  it('window focus only re-checks once the daily cadence has elapsed', async () => {
+  it('window focus never starts a network update check', async () => {
     startUpdatePoller()
     await vi.advanceTimersByTimeAsync(0)
     checkMock.mockClear()
@@ -1672,10 +1672,10 @@ describe('startUpdatePoller', () => {
     vi.setSystemTime(Date.now() + BACKGROUND_UPDATE_CHECK_MS)
     listeners['focus']?.()
     await vi.advanceTimersByTimeAsync(0)
-    expect(checkMock).toHaveBeenCalledTimes(1)
+    expect(checkMock).not.toHaveBeenCalled()
   })
 
-  it('re-checks backend updates when switching directly between two remote profiles', async () => {
+  it('does not check updates when switching remote targets', async () => {
     // Both profiles resolve to mode: 'remote' — only baseUrl differs. A
     // mode-only comparison would treat this as "no change" and never
     // re-check, leaving profile A's stale status on screen for profile B.
@@ -1717,10 +1717,10 @@ describe('startUpdatePoller', () => {
     })
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(checkHermesUpdateSpy).toHaveBeenCalled()
+    expect(checkHermesUpdateSpy).not.toHaveBeenCalled()
   })
 
-  it('re-checks backend updates when switching between two profiles on the same remote backend', async () => {
+  it('does not check updates when switching remote profiles', async () => {
     // Pooled profiles share a baseUrl; only the profile field differs. The
     // update check is profile-scoped (per-profile overrides can pin a
     // different channel/branch), so a baseUrl-only key would treat this as
@@ -1756,10 +1756,10 @@ describe('startUpdatePoller', () => {
     setConnection(pooled('beta'))
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(checkHermesUpdateSpy).toHaveBeenCalled()
+    expect(checkHermesUpdateSpy).not.toHaveBeenCalled()
   })
 
-  it('discards a stale in-flight response and re-checks after switching to B before A resolves', async () => {
+  it('checks a switched target only on request', async () => {
     // A's check is still in flight when the switch to B happens — B's
     // trigger is locked out by $backendUpdateChecking. Once A's (now stale)
     // response lands it must not overwrite the display with A's result, and
@@ -1795,7 +1795,8 @@ describe('startUpdatePoller', () => {
     })
 
     startUpdatePoller()
-    // A's checkHermesUpdate() call is now in flight (aPending unresolved).
+    void checkBackendUpdates()
+    // The explicitly requested check is now in flight.
     // Switch profiles before it settles.
 
     setConnection({
@@ -1823,8 +1824,9 @@ describe('startUpdatePoller', () => {
     // Flush the automatic follow-up check queued for B once A's lock cleared.
     await vi.advanceTimersByTimeAsync(0)
 
+    expect(checkHermesUpdateSpy).toHaveBeenCalledTimes(1)
+    await checkBackendUpdates()
     expect(checkHermesUpdateSpy).toHaveBeenCalledTimes(2)
-    // B's result (behind: 4), not A's stale one (behind: 1).
     expect($backendUpdateStatus.get()?.behind).toBe(4)
   })
 })

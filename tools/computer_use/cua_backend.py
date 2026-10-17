@@ -66,8 +66,12 @@ def _cua_no_overlay() -> bool:
 
 
 def _cua_telemetry_disabled() -> bool:
-    """True unless ``computer_use.cua_telemetry`` opts in (unreadable config fails SAFE toward disabling)."""
-    return not bool(_computer_use_cfg().get("cua_telemetry", False))
+    """The fork policy overrides configured CUA telemetry opt-ins."""
+    from hermes_cli.fork_network_policy import OPTIONAL_NETWORK_ALLOWED
+
+    return not OPTIONAL_NETWORK_ALLOWED or not bool(
+        _computer_use_cfg().get("cua_telemetry", False)
+    )
 
 def _cua_configured_permission_mode() -> str:
     """``computer_use.permission_mode``: ``standard`` (default) or ``bounded``; unknown values fall closed to
@@ -173,15 +177,10 @@ def sandbox_mcp_invocation() -> Optional[tuple[tuple[str, list[str]], dict[str, 
 
 
 def sanitized_cua_driver_env() -> dict[str, str]:
-    """``cua_driver_child_env()`` with Hermes provider secrets stripped — cua-driver is a third-party binary and must
-    never inherit API keys. Falls back to the unsanitized telemetry env if the sanitizer can't import."""
-    env = cua_driver_child_env()
-    with contextlib.suppress(Exception):
-        # cua-driver is a third-party binary — never hand it provider API keys via inherited env (same
-        # policy as the manifest probe and MCP spawn; #53503/#55709/#58889 lineage).
-        from tools.environments.local import _sanitize_subprocess_env
-        return _sanitize_subprocess_env(env)
-    return env
+    """Strip provider secrets, refusing the child launch if filtering fails."""
+    from tools.environments.local import _sanitize_subprocess_env
+
+    return _sanitize_subprocess_env(cua_driver_child_env())
 
 def _run_quiet(argv: list[str], *, timeout: float, swallow: Any = (), **kw: Any) -> Any:
     """``subprocess.run`` for short probe verbs: text mode, stdin=DEVNULL unless overridden (older drivers fall into a

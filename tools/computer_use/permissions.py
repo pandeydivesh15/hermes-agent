@@ -37,16 +37,10 @@ def stale_tcc_grant_hint(*missing: str) -> str:
             f"driver's signature): run `{resets}`, then `hermes computer-use permissions grant`.")
 
 def _child_env() -> dict[str, str]:
-    """cua-driver child env (telemetry policy + provider secrets stripped); ``os.environ`` on import error.
+    """Build the driver environment, failing closed on filter errors."""
+    from tools.computer_use.cua_backend import sanitized_cua_driver_env
 
-    cua-driver is a third-party binary — it must never inherit provider API keys (#53503/#55709/#58889
-    lineage). Each layer degrades gracefully so permission probes never break on a helper import error.
-    """
-    try:
-        from tools.computer_use.cua_backend import sanitized_cua_driver_env
-        return sanitized_cua_driver_env()
-    except Exception:
-        return dict(os.environ)
+    return sanitized_cua_driver_env()
 
 def _run(binary: str, *args: str, timeout: float) -> subprocess.CompletedProcess:
     return subprocess.run([binary, *args], capture_output=True, text=True, encoding='utf-8', errors='replace',

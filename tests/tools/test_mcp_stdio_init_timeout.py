@@ -76,7 +76,7 @@ class TestStdioInitializeTimeout:
                  patch.object(_mcp_config, "_resolve_stdio_command", lambda c, e: (c, e)), \
                  patch.object(_mcp_config, "_write_stderr_log_header", lambda *_a, **_k: None), \
                  patch.object(mcp_tool, "_get_mcp_stderr_log", lambda: None), \
-                 patch("tools.osv_check.check_package_for_malware",
+                 patch("tools.osv_check.check_cached_package_for_malware",
                        lambda *_a, **_k: None):
                 start = time.monotonic()
                 # The outer 5s guard exists ONLY so a regression can't hang the

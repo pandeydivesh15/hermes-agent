@@ -415,6 +415,9 @@ class WebSocketRelayTransport:
     async def _dial_and_start(self) -> None:
         """Open the socket, start the reader, send hello(s). Used by connect() and
         by the reconnect supervisor / fresh-token retry on a re-dial."""
+        from hermes_cli.fork_network_policy import require_optional_network
+
+        require_optional_network("Relay")
         self._descriptor_ready = asyncio.get_running_loop().create_future()
         self._dial_generation += 1
         # Fresh handshake generation: a reconnected connector re-sends one

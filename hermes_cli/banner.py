@@ -276,7 +276,9 @@ def prefetch_update_check():
 
     No-op under pytest — see ``_skip_background_prefetch``.
     """
-    if _skip_background_prefetch():
+    from hermes_cli.fork_network_policy import OPTIONAL_NETWORK_ALLOWED
+
+    if not OPTIONAL_NETWORK_ALLOWED or _skip_background_prefetch():
         _update_check_done.set()
         return
 

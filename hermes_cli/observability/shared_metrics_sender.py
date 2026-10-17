@@ -91,6 +91,9 @@ class _Response:
 
 def _post(endpoint: str, payload: bytes, *, timeout: int) -> _Response:
     """POST one package. Raises on transport failure; never on HTTP status."""
+    from hermes_cli.fork_network_policy import require_optional_network
+
+    require_optional_network("Shared metrics")
     headers = {
         "Content-Type": "application/json",
         "User-Agent": "hermes-agent-shared-metrics/1",

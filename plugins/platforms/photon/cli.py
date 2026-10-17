@@ -264,6 +264,10 @@ def _cmd_status(_args: argparse.Namespace) -> int:
 
 def _telemetry_enabled() -> bool:
     """PHOTON_TELEMETRY from env / ~/.hermes/.env; truthy set mirrors the sidecar's."""
+    from hermes_cli.fork_network_policy import OPTIONAL_NETWORK_ALLOWED
+
+    if not OPTIONAL_NETWORK_ALLOWED:
+        return False
     try:
         from hermes_cli.config import get_env_value
         raw = get_env_value("PHOTON_TELEMETRY")
@@ -273,7 +277,12 @@ def _telemetry_enabled() -> bool:
 
 
 def _cmd_telemetry(args: argparse.Namespace) -> int:
+    from hermes_cli.fork_network_policy import OPTIONAL_NETWORK_ALLOWED
+
     state = getattr(args, "state", None)
+    if not OPTIONAL_NETWORK_ALLOWED:
+        print("Photon telemetry is disabled in this fork.")
+        return 1 if state == "on" else 0
     if state is None:
         print(f"Photon telemetry: {'on' if _telemetry_enabled() else 'off'}")
         print("  Toggle with `hermes photon telemetry on` / `hermes photon telemetry off`.")

@@ -58,8 +58,12 @@ class RelayMediaClient:
 
     @property
     def enabled(self) -> bool:
-        """True when the client can authenticate (per-gateway creds present)."""
-        return bool(self._base_url and self._gateway_id and self._secret)
+        """Require fork permission as well as per-gateway credentials."""
+        from hermes_cli.fork_network_policy import OPTIONAL_NETWORK_ALLOWED
+
+        return OPTIONAL_NETWORK_ALLOWED and bool(
+            self._base_url and self._gateway_id and self._secret
+        )
 
     def _bearer(self) -> str:
         return make_upgrade_token(self._gateway_id, self._secret)
@@ -114,7 +118,9 @@ class RelayMediaClient:
         The bearer is presented only for connector re-host URLs; public URLs
         (e.g. a Discord CDN pass-through) are fetched without it.
         """
-        if not url:
+        from hermes_cli.fork_network_policy import OPTIONAL_NETWORK_ALLOWED
+
+        if not OPTIONAL_NETWORK_ALLOWED or not url:
             return None
         needs_auth = self.is_relay_media_url(url)
         if needs_auth and not self.enabled:

@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib import error as urlerror
 from urllib import request as urlrequest
+from urllib.parse import urlsplit
 
 from agent.shell_hooks import (
     _TOOL_EVENTS as _TOOL_SCOPED_EVENTS,
@@ -176,8 +177,20 @@ def _parse_single_target(index: int, raw: Any) -> Optional[WebhookTarget]:
     if not url.lower().startswith(("http://", "https://")):
         warn(".url must be http(s); got %r — skipped", url)
         return None
-    if url.lower().startswith("http://"):
-        warn(".url uses plain http:// — payloads (including tool inputs) travel unencrypted. Prefer https.")
+    try:
+        parsed = urlsplit(url)
+        host = parsed.hostname
+    except ValueError:
+        warn(".url is malformed; skipped")
+        return None
+    if not host or parsed.username is not None or parsed.password is not None:
+        warn(".url requires a host without embedded credentials; skipped")
+        return None
+    if parsed.scheme == "http" and host not in {
+        "localhost", "127.0.0.1", "::1",
+    }:
+        warn(".url requires HTTPS for remote targets; skipped")
+        return None
     events_raw = raw.get("events")
     valid_list = ", ".join(sorted(VALID_HOOKS))
     if not isinstance(events_raw, list) or not events_raw:
@@ -312,6 +325,9 @@ class _NoRedirectHandler(urlrequest.HTTPRedirectHandler):
 
 
 _opener = urlrequest.build_opener(_NoRedirectHandler)
+_loopback_opener = urlrequest.build_opener(
+    urlrequest.ProxyHandler({}), _NoRedirectHandler,
+)
 
 
 def _deliver(delivery: dict[str, Any]) -> None:
@@ -321,7 +337,11 @@ def _deliver(delivery: dict[str, Any]) -> None:
     for attempt in range(1, MAX_DELIVERY_ATTEMPTS + 1):
         req = urlrequest.Request(delivery["url"], data=delivery["body"], headers=delivery["headers"], method="POST")
         try:
-            with _opener.open(req, timeout=delivery["timeout"]) as resp:
+            opener = (
+                _loopback_opener if urlsplit(delivery["url"]).scheme == "http"
+                else _opener
+            )
+            with opener.open(req, timeout=delivery["timeout"]) as resp:
                 status = getattr(resp, "status", 200)
             if 200 <= status < 300:
                 logger.debug("outbound webhook delivered: %s -> %s (HTTP %d)", event, label, status)

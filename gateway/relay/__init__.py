@@ -101,7 +101,9 @@ def relay_explicitly_disabled() -> bool:
 
 def relay_url() -> Optional[str]:
     """Effective connector URL; an explicit platform disable vetoes even an env URL."""
-    if relay_explicitly_disabled():
+    from hermes_cli.fork_network_policy import OPTIONAL_NETWORK_ALLOWED
+
+    if not OPTIONAL_NETWORK_ALLOWED or relay_explicitly_disabled():
         return None
     return _env_or_cfg_url("GATEWAY_RELAY_URL", "relay_url")
 
@@ -246,6 +248,9 @@ def _provision_url(relay_dial_url: str) -> str:
 
 def _json_post(url: str, token: str, body: dict, timeout: float):
     """Bearer-authenticated JSON POST; returns the open response (caller reads it)."""
+    from hermes_cli.fork_network_policy import require_optional_network
+
+    require_optional_network("Relay")
     req = urllib.request.Request(
         url,
         data=json.dumps(body).encode("utf-8"),
@@ -414,6 +419,9 @@ def _resolve_relay_identity_token() -> str:
     Raises on failure; callers decide whether that's fatal (enroll CLI) or a graceful
     boot no-op (self-provision).
     """
+    from hermes_cli.fork_network_policy import require_optional_network
+
+    require_optional_network("Relay identity")
     env = {k: os.environ.get(f"GATEWAY_RELAY_IDP_{k.upper()}", "").strip() for k in _IDP_KEYS}
     if not env["token_url"]:
         # Env token_url absent -> the whole idp block comes from config (env id/secret

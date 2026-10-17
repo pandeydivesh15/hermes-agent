@@ -1,9 +1,8 @@
 """OSV malware check for MCP extension packages.
 
-Before launching an MCP server via npx/uvx, queries Google's free public OSV API for
-known malware advisories (MAL-* IDs). Regular CVEs are ignored — only confirmed malware
-is blocked. Fail-open: network errors allow the package to proceed (~300ms typical).
-Inspired by Block/goose's extension malware check.
+Automatic MCP startup consults local verdicts only. Explicit checks query OSV
+for known malware advisories (MAL-* IDs). Regular CVEs are ignored. Cached
+malware verdicts remain blocking offline until an explicit audit clears them.
 """
 import json
 import logging
@@ -102,7 +101,7 @@ def _load_disk_cache() -> None:
             continue
         expiry = entry.get("expiry")
         result = entry.get("result")
-        if expiry is None or expiry <= now:
+        if expiry is None or (expiry <= now and not result):
             continue
         parts = key_str.split("|", 2)
         if len(parts) != 3:
@@ -139,14 +138,19 @@ def _save_disk_cache() -> None:
         logger.debug("Failed to save OSV disk cache to %s: %s", path, exc)
 
 
-def _cache_get(key) -> tuple[bool, Optional[str]]:
-    """Return (hit, result) for a fresh cache entry."""
+def _cache_get(
+    key, *, allow_stale_malware: bool = False,
+) -> tuple[bool, Optional[str]]:
+    """Return a verdict, retaining known malware for offline admission."""
     with _cache_lock:
         _load_disk_cache()
         entry = _cache.get(key)
-        if entry is not None and time.time() < entry[0]:
+        if entry is not None and (
+            time.time() < entry[0] or (allow_stale_malware and entry[1])
+        ):
             return True, entry[1]
-        _cache.pop(key, None)  # absent or expired
+        if entry is not None and not entry[1]:
+            _cache.pop(key, None)
         return False, None
 
 
@@ -155,12 +159,35 @@ def _cache_put(key, result: Optional[str]) -> None:
         _load_disk_cache()
         if len(_cache) >= _CACHE_MAX_ENTRIES:
             now = time.time()
-            for k in [k for k, (exp, _) in _cache.items() if exp <= now]:
+            for k in [k for k, (exp, result) in _cache.items()
+                      if exp <= now and not result]:
                 del _cache[k]
             if len(_cache) >= _CACHE_MAX_ENTRIES:
-                _cache.clear()  # tiny working set in practice; safe reset
+                for k in [k for k, (_, result) in _cache.items() if not result]:
+                    del _cache[k]
         _cache[key] = (time.time() + _CACHE_TTL_S, result)
         _save_disk_cache()
+
+
+def check_cached_package_for_malware(
+    command: str, args: list,
+) -> Optional[str]:
+    """Use local advisory verdicts without disclosing package metadata."""
+    ecosystem = _infer_ecosystem(command)
+    if not ecosystem:
+        return None
+    package, version = _parse_package_from_args(args, ecosystem)
+    if not package:
+        return None
+    hit, verdict = _cache_get(
+        (ecosystem, package, version), allow_stale_malware=True,
+    )
+    if not hit:
+        logger.warning(
+            "No local malware verdict for %s/%s; automatic online checks "
+            "are disabled in this fork", ecosystem, package,
+        )
+    return verdict if hit else None
 
 
 def check_package_for_malware(command: str, args: list) -> Optional[str]:

@@ -19,6 +19,7 @@ import type {
 } from '@/global'
 import { checkHermesUpdate, getActionStatus, updateHermes } from '@/hermes'
 import { translateNow } from '@/i18n'
+import { OPTIONAL_NETWORK_ALLOWED } from '@/lib/fork-network-policy'
 import { persistString, storedString } from '@/lib/storage'
 import { $connectionsRegistry, refreshConnectionsRegistry } from '@/store/connections'
 import { reconnectGateway } from '@/store/gateway-reconnect'
@@ -1332,6 +1333,10 @@ function passiveCheckDue(now: number): boolean {
 }
 
 function runPassiveChecks(): void {
+  if (!OPTIONAL_NETWORK_ALLOWED) {
+    return
+  }
+
   persistString(FOCUS_RECHECK_KEY, String(Date.now()))
   void checkUpdates()
   void checkBackendUpdates()
@@ -1367,13 +1372,16 @@ export function startUpdatePoller(): void {
 
     lastConnectionKey = key
 
-    if (conn?.mode === 'remote') {
+    if (OPTIONAL_NETWORK_ALLOWED && conn?.mode === 'remote') {
       void checkBackendUpdates()
     }
   })
 
   window.addEventListener('focus', onFocus)
-  backgroundTimer = setInterval(runPassiveChecks, BACKGROUND_UPDATE_CHECK_MS)
+
+  if (OPTIONAL_NETWORK_ALLOWED) {
+    backgroundTimer = setInterval(runPassiveChecks, BACKGROUND_UPDATE_CHECK_MS)
+  }
 }
 
 export function stopUpdatePoller(): void {

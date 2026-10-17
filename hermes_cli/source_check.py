@@ -414,6 +414,12 @@ def check_for_updates(*, install_root: Path | None = None, home: Path | None = N
     from hermes_cli.update_channel import channel_record, install_id, resolve_update_channel, rides_default_channel
     from hermes_cli.release_channels import validate_name
 
+    from hermes_cli.fork_network_policy import OPTIONAL_NETWORK_ALLOWED
+
+    if passive and not OPTIONAL_NETWORK_ALLOWED:
+        return {"supported": False, "reason": "disabled", "behind": None,
+                "commits": []}
+
     embedded = (os.environ.get("HERMES_REVISION") or None) if install_root is None else None
     root = Path(install_root if install_root is not None else get_project_root()).resolve()
     home = Path(home if home is not None else get_hermes_home()).resolve()

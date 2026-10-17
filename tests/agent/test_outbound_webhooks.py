@@ -101,6 +101,30 @@ def _cfg(*entries):
     return {"hooks": {"outbound": list(entries)}}
 
 
+def test_loopback_plaintext_delivery_bypasses_environment_proxy(
+    http_server, monkeypatch,
+):
+    from urllib.request import build_opener
+
+    url = _url(http_server)
+    monkeypatch.setenv("http_proxy", url)
+    monkeypatch.setenv("no_proxy", "")
+    monkeypatch.setenv("NO_PROXY", "")
+    monkeypatch.setattr(
+        outbound_webhooks, "_opener",
+        build_opener(outbound_webhooks._NoRedirectHandler),
+    )
+    target = outbound_webhooks.iter_configured_targets(_cfg({
+        "url": url, "events": ["pre_tool_call"],
+    }))[0]
+    delivery = outbound_webhooks._build_delivery(
+        "pre_tool_call", target, b'{"synthetic":true}', "test-delivery",
+    )
+    outbound_webhooks._deliver(delivery)
+    assert len(http_server.captured) == 1
+    assert http_server.captured[0]["path"] == "/hook"
+
+
 # ── config parsing ────────────────────────────────────────────────────────
 
 

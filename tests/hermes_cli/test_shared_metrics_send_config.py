@@ -43,9 +43,9 @@ class TestSendRequiresCollection:
         assert resolved.enabled is True
         assert resolved.send is False
 
-    def test_send_with_collection_sends(self):
+    def test_send_with_collection_is_blocked_by_fork(self):
         resolved = resolve_send_config(_config(enabled=True, send=True))
-        assert resolved.send is True
+        assert resolved.send is False
 
     def test_send_without_collection_is_refused(self):
         resolved = resolve_send_config(_config(enabled=False, send=True))
@@ -104,11 +104,11 @@ class TestTransportSafety:
             "http://127.0.0.1:8099/v1/telemetry",
         ],
     )
-    def test_loopback_http_is_allowed_for_testing(self, endpoint):
+    def test_loopback_http_is_also_blocked_by_fork(self, endpoint):
         resolved = resolve_send_config(
             _config(enabled=True, send=True, endpoint=endpoint)
         )
-        assert resolved.send is True
+        assert resolved.send is False
 
     def test_nonsense_scheme_is_refused(self):
         resolved = resolve_send_config(

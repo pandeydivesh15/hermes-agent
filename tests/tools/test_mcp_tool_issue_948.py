@@ -156,7 +156,10 @@ def test_run_stdio_malware_check_does_not_block_event_loop():
             ticks["n"] += 1
 
     async def _test():
-        with patch("tools.osv_check.check_package_for_malware", side_effect=slow_check), \
+        with patch(
+            "tools.osv_check.check_cached_package_for_malware",
+            side_effect=slow_check,
+        ), \
              patch("tools.mcp_tool_config._managed_launcher", return_value=None), \
              patch("tools.mcp_tool.StdioServerParameters"), \
              patch("tools.mcp_tool.stdio_client", return_value=mock_stdio_cm), \
@@ -184,7 +187,10 @@ def test_run_stdio_malware_check_times_out_fail_open():
         return "MALWARE"  # would block startup if awaited to completion
 
     async def _test():
-        with patch("tools.osv_check.check_package_for_malware", side_effect=hung_check), \
+        with patch(
+            "tools.osv_check.check_cached_package_for_malware",
+            side_effect=hung_check,
+        ), \
              patch("tools.mcp_tool._OSV_MALWARE_CHECK_TIMEOUT_S", 0.2), \
              patch("tools.mcp_tool_config._managed_launcher", return_value=None), \
              patch("tools.mcp_tool.StdioServerParameters"), \

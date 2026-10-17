@@ -138,7 +138,9 @@ def test_preflight_checks_original_package_before_cache_access(tmp_path, monkeyp
         seen.append((command, list(arguments)))
         return "malicious package" if rejected else None
 
-    monkeypatch.setattr("tools.osv_check.check_package_for_malware", check)
+    monkeypatch.setattr(
+        "tools.osv_check.check_cached_package_for_malware", check,
+    )
     if rejected:
         monkeypatch.setattr(mcp_tool, "_npx_cached_bin", lambda *a: pytest.fail("cache read before refusal"))
         with pytest.raises(ValueError, match="malicious package"):

@@ -56,6 +56,10 @@ def _require_sdk(names: Iterable[str] = _SPAN_SDK, *, auto_install: bool = True)
     security.allow_lazy_installs.  Any lazy-install failure falls through to the
     import attempt, which raises OTLPUnavailable with a manual install hint.
     """
+    from hermes_cli.fork_network_policy import OPTIONAL_NETWORK_ALLOWED
+
+    if not OPTIONAL_NETWORK_ALLOWED:
+        raise OTLPUnavailable("OTLP export is disabled in this fork")
     if auto_install:
         try:
             from pm import ensure_import as _lazy_ensure
@@ -256,7 +260,11 @@ def is_available() -> bool:
 
 def is_enabled(config: dict[str, Any]) -> bool:
     otlp = _otlp_config(config)
-    return bool(otlp.get("enabled") and otlp.get("endpoint"))
+    from hermes_cli.fork_network_policy import OPTIONAL_NETWORK_ALLOWED
+
+    return OPTIONAL_NETWORK_ALLOWED and bool(
+        otlp.get("enabled") and otlp.get("endpoint")
+    )
 
 
 def start_streaming(
