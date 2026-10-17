@@ -33,6 +33,9 @@ hermes_sync() {
 # hermes_bootstrap_python REPO: print the interpreter that can run pm before
 # any dependency is importable. It only emits the environment; it installs nothing.
 hermes_bootstrap_python() {
+    if [ -n "${ZSH_VERSION-}" ]; then
+        setopt localoptions nonomatch
+    fi
     local repo="$1" store candidate
     for candidate in "$repo/.venv/bin/python" "$repo/.venv/Scripts/python.exe" \
                      "$repo/venv/bin/python" "$repo/venv/Scripts/python.exe"; do
